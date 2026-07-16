@@ -162,12 +162,7 @@ export default function SignupPage() {
           </button>
         </form>
 
-        <div className="mt-6 p-3 bg-blue-50 rounded-lg">
-          <p className="text-xs text-blue-700">
-            💡 初期パスワードは <strong>Nojima + 社員番号</strong> になります
-            <br />（例：005970 → Nojima005970）
-          </p>
-        </div>
+        {/* 初期パスワードのルールは社内で別途周知 */}
       </div>
     </div>
   )
