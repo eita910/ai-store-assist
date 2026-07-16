@@ -6,14 +6,15 @@ import { useRouter } from 'next/navigation'
 
 const ROLE_LABELS: Record<string, string> = {
   staff: 'スタッフ',
+  leader: 'リーダー',
   manager: '店長',
-  headquarters: '本部',
   admin: 'アドミン',
 }
 
 // アドミンは自分（005970）だけ固定。設定画面では選べない
 const ROLE_LIST = [
   { value: 'staff', label: 'スタッフ' },
+  { value: 'leader', label: 'リーダー' },
   { value: 'manager', label: '店長' },
 ]
 
