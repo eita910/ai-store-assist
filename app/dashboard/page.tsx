@@ -13,51 +13,58 @@ type Customer = {
   monthly_fee: number | null
   paying_lines: number | null
   status: string
+  store_id: string
   created_at: string
+}
+
+type Store = {
+  id: string
+  store_code: string
+  name: string
+  area: string
 }
 
 export default function DashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [stores, setStores] = useState<Store[]>([])
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('all')
   const [loading, setLoading] = useState(true)
   const [showQR, setShowQR] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [staff, setStaff] = useState<any>(null)
   const router = useRouter()
-
   const supabase = createClient()
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.push('/login'); return }
       setUser(user)
-      // staff情報を取得
       const { data: s } = await supabase.from('staff').select('*, stores(*)').eq('id', user.id).single()
-      if (s) setStaff(s)
+      if (s) {
+        setStaff(s)
+        setSelectedStoreId(s.store_id)
+      }
     })
 
-    const fetchCustomers = async () => {
-      const { data } = await supabase
-        .from('customers')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50)
-      if (data) setCustomers(data)
-      setLoading(false)
-    }
+    // 全店舗を取得（フィルタ用）
+    supabase.from('stores').select('*').then(({ data }) => {
+      if (data) setStores(data)
+    })
+
     fetchCustomers()
-
-    const sub = supabase
-      .channel('customers-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, (payload) => {
-        if (payload.eventType === 'INSERT')
-          setCustomers((prev) => [payload.new as Customer, ...prev])
-        if (payload.eventType === 'UPDATE')
-          setCustomers((prev) => prev.map((c) => c.id === payload.new.id ? (payload.new as Customer) : c))
-      })
-      .subscribe()
-
-    return () => { sub.unsubscribe() }
   }, [router])
+
+  const fetchCustomers = async () => {
+    let query = supabase.from('customers').select('*').order('created_at', { ascending: false }).limit(50)
+    const { data } = await query
+    if (data) setCustomers(data)
+    setLoading(false)
+  }
+
+  // 表示フィルタ（全件 or 選択店舗のみ）
+  const filteredCustomers = selectedStoreId === 'all'
+    ? customers
+    : customers.filter((c) => c.store_id === selectedStoreId)
 
   const issueReceipt = async () => {
     if (!user) return
@@ -79,7 +86,6 @@ export default function DashboardPage() {
     const origin = window.location.origin
     const surveyUrl = `${origin}/survey/${receipt}`
 
-    // customersに事前INSERT（store_idとstaff_idを紐づける）
     await supabase.from('customers').insert({
       receipt_number: receipt,
       store_id: staff.store_id,
@@ -110,8 +116,8 @@ export default function DashboardPage() {
     return styles[status] || 'bg-gray-100 text-gray-500'
   }
 
-  const waitingCount = customers.filter((c) => c.status !== 'completed').length
-  const completedCount = customers.filter((c) => c.status === 'completed').length
+  const waitingCount = filteredCustomers.filter((c) => c.status !== 'completed').length
+  const completedCount = filteredCustomers.filter((c) => c.status === 'completed').length
 
   return (
     <div className="min-h-screen bg-[#EFF6FF]">
@@ -125,7 +131,23 @@ export default function DashboardPage() {
               className="text-sm text-blue-100 hover:text-white">ログアウト</button>
           </div>
         </div>
-        <p className="text-sm text-blue-100 mt-1">
+      </div>
+
+      {/* 店舗フィルタ */}
+      <div className="px-4 pt-4 max-w-2xl mx-auto">
+        <select
+          value={selectedStoreId}
+          onChange={(e) => setSelectedStoreId(e.target.value)}
+          className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] bg-white focus:outline-none focus:border-[#1A56DB]"
+        >
+          <option value="all">📋 全店舗</option>
+          {stores.map((store) => (
+            <option key={store.id} value={store.id}>
+              {store.area} {store.name}
+            </option>
+          ))}
+        </select>
+        <p className="text-sm text-gray-500 mt-2">
           ⚪ 対応待ち: {waitingCount}件  ✅ 完了: {completedCount}件
         </p>
       </div>
@@ -158,12 +180,12 @@ export default function DashboardPage() {
       <div className="p-4 max-w-2xl mx-auto space-y-3">
         {loading ? (
           <div className="text-center text-gray-500 py-8">読み込み中...</div>
-        ) : customers.length === 0 ? (
+        ) : filteredCustomers.length === 0 ? (
           <div className="text-center text-gray-400 py-8">
             「受付番号を発行する」ボタンからQRコードを発行してください
           </div>
         ) : (
-          customers.map((customer) => (
+          filteredCustomers.map((customer) => (
             <div key={customer.id}
               className="bg-white rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
               onClick={() => router.push(`/customer/${customer.id}`)}>
