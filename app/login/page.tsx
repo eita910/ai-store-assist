@@ -45,7 +45,7 @@ export default function LoginPage() {
             <input
               type="text"
               inputMode="numeric"
-              placeholder="12345"
+              placeholder="000001"
               value={employeeCode}
               onChange={(e) => setEmployeeCode(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB]"

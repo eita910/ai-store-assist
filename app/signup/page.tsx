@@ -31,7 +31,7 @@ export default function SignupPage() {
     const email = `${code}@store.local`
     const password = getInitialPassword(code)
 
-    // 1. Authユーザーを作成
+    // 1. Authユーザーを作成（Supabaseのadmin APIを使えないのでanon keyで登録）
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
@@ -68,6 +68,8 @@ export default function SignupPage() {
       return
     }
 
+    // ログアウトして登録完了画面へ
+    await supabase.auth.signOut()
     setCompleted(true)
     setLoading(false)
   }
@@ -116,7 +118,7 @@ export default function SignupPage() {
             <input
               type="text"
               inputMode="numeric"
-              placeholder="005970"
+              placeholder="000001"
               value={employeeCode}
               onChange={(e) => setEmployeeCode(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB]"
