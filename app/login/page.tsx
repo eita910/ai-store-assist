@@ -79,10 +79,10 @@ export default function LoginPage() {
             {loading ? 'ログイン中...' : 'ログイン'}
           </button>
 
-          <button type="button" onClick={() => router.push('/signup')}
-            className="w-full py-2 text-gray-500 text-sm hover:text-gray-700">
+          <a href="/signup"
+            className="block w-full py-2 text-gray-500 text-sm hover:text-gray-700 text-center">
             新規登録はこちら
-          </button>
+          </a>
         </form>
       </div>
     </div>
