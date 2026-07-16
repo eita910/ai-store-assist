@@ -4,10 +4,25 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
+const ROLE_LABELS: Record<string, string> = {
+  staff: 'スタッフ',
+  manager: '店長',
+  headquarters: '本部',
+  admin: 'アドミン',
+}
+
+const ROLE_LIST = [
+  { value: 'staff', label: 'スタッフ' },
+  { value: 'manager', label: '店長' },
+  { value: 'headquarters', label: '本部' },
+  { value: 'admin', label: 'アドミン' },
+]
+
 export default function SettingsPage() {
   const [user, setUser] = useState<any>(null)
   const [staff, setStaff] = useState<any>(null)
   const [store, setStore] = useState<any>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [form, setForm] = useState({
     area: '',
     store_code: '',
@@ -15,6 +30,7 @@ export default function SettingsPage() {
     employee_code: '',
     name: '',
   })
+  const [selectedRole, setSelectedRole] = useState('staff')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -26,10 +42,11 @@ export default function SettingsPage() {
       if (!user) { router.push('/login'); return }
       setUser(user)
 
-      // staff情報を取得
       const { data: s } = await supabase.from('staff').select('*, stores(*)').eq('id', user.id).single()
       if (s) {
         setStaff(s)
+        setIsAdmin(s.role === 'admin')
+        setSelectedRole(s.role || 'staff')
         setForm({
           area: s.stores?.area || '',
           store_code: s.stores?.store_code || '',
@@ -48,12 +65,10 @@ export default function SettingsPage() {
     if (!user) return
     setSaving(true); setError(''); setSaved(false)
 
-    // 必須チェック
     if (!form.store_code || !form.store_name || !form.area || !form.name) {
       setError('すべての項目を入力してください'); setSaving(false); return
     }
 
-    // storesテーブルをupsert
     const { data: storeData, error: storeErr } = await supabase
       .from('stores')
       .upsert(
@@ -63,15 +78,21 @@ export default function SettingsPage() {
       .select()
       .single()
 
-    if (storeErr) { setError('店舗情報の保存に失败しました'); setSaving(false); return }
+    if (storeErr) { setError('店舗情報の保存に失敗しました'); setSaving(false); return }
 
-    // staffテーブルをupdate
+    const updateData: any = {
+      store_id: storeData.id,
+      name: form.name,
+    }
+
+    // adminだけがロールを変更可能
+    if (isAdmin && selectedRole !== staff?.role) {
+      updateData.role = selectedRole
+    }
+
     const { error: staffErr } = await supabase
       .from('staff')
-      .update({
-        store_id: storeData.id,
-        name: form.name,
-      })
+      .update(updateData)
       .eq('id', user.id)
 
     if (staffErr) { setError('スタッフ情報の保存に失敗しました'); setSaving(false); return }
@@ -96,7 +117,7 @@ export default function SettingsPage() {
           </p>
 
           <div className="space-y-4">
-            {/* ① エリア */}
+            {/* エリア */}
             <div>
               <label className="block text-sm font-bold text-[#1F2937] mb-1">
                 ① エリア <span className="text-red-500">*</span>
@@ -106,7 +127,7 @@ export default function SettingsPage() {
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB]" />
             </div>
 
-            {/* ② 店舗番号 */}
+            {/* 店舗番号 */}
             <div>
               <label className="block text-sm font-bold text-[#1F2937] mb-1">
                 ② 店舗番号 <span className="text-red-500">*</span>
@@ -116,7 +137,7 @@ export default function SettingsPage() {
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB]" />
             </div>
 
-            {/* ③ 店舗名 */}
+            {/* 店舗名 */}
             <div>
               <label className="block text-sm font-bold text-[#1F2937] mb-1">
                 ③ 店舗名 <span className="text-red-500">*</span>
@@ -126,7 +147,7 @@ export default function SettingsPage() {
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB]" />
             </div>
 
-            {/* ④ 社員番号 */}
+            {/* 社員番号 */}
             <div>
               <label className="block text-sm font-bold text-[#1F2937] mb-1">
                 ④ 社員番号
@@ -136,7 +157,7 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-400 mt-1">※ ログインに使用している社員番号です</p>
             </div>
 
-            {/* ⑤ 名前 */}
+            {/* 名前 */}
             <div>
               <label className="block text-sm font-bold text-[#1F2937] mb-1">
                 ⑤ あなたの名前 <span className="text-red-500">*</span>
@@ -144,6 +165,30 @@ export default function SettingsPage() {
               <input type="text" placeholder="例：須藤"
                 value={form.name} onChange={(e) => set('name', e.target.value)}
                 className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB]" />
+            </div>
+
+            {/* ロール表示（全員見える） */}
+            <div>
+              <label className="block text-sm font-bold text-[#1F2937] mb-1">
+                ⑥ 権限 <span className="text-red-500">*</span>
+              </label>
+              {isAdmin ? (
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB] bg-white"
+                >
+                  {ROLE_LIST.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" value={ROLE_LABELS[staff?.role] || 'スタッフ'} disabled
+                  className="w-full border border-gray-100 rounded-lg px-4 py-3 text-gray-400 bg-gray-50 cursor-not-allowed" />
+              )}
+              <p className="text-xs text-gray-400 mt-1">
+                {isAdmin ? '※ アドミンは権限を変更できます' : '※ 権限の変更はアドミンに依頼してください'}
+              </p>
             </div>
 
             {error && <p className="text-red-500 text-sm">{error}</p>}
