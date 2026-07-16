@@ -29,9 +29,9 @@ export default function DashboardPage() {
   const [stores, setStores] = useState<Store[]>([])
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all')
   const [loading, setLoading] = useState(true)
-  const [showQR, setShowQR] = useState<string | null>(null)
   const [user, setUser] = useState<any>(null)
   const [staff, setStaff] = useState<any>(null)
+  const [fixedQrUrl, setFixedQrUrl] = useState('')
   const router = useRouter()
   const supabase = createClient()
 
@@ -43,10 +43,12 @@ export default function DashboardPage() {
       if (s) {
         setStaff(s)
         setSelectedStoreId(s.store_id)
+        // 固定QRコードのURL（スタッフがログイン中は常に同じ）
+        const origin = window.location.origin
+        setFixedQrUrl(`${origin}/survey/start?staff=${s.employee_code}&store=${s.stores?.store_code || ''}`)
       }
     })
 
-    // 全店舗を取得（フィルタ用）
     supabase.from('stores').select('*').then(({ data }) => {
       if (data) setStores(data)
     })
@@ -61,42 +63,9 @@ export default function DashboardPage() {
     setLoading(false)
   }
 
-  // 表示フィルタ（全件 or 選択店舗のみ）
   const filteredCustomers = selectedStoreId === 'all'
     ? customers
     : customers.filter((c) => c.store_id === selectedStoreId)
-
-  const issueReceipt = async () => {
-    if (!user) return
-    if (!staff || !staff.stores) {
-      router.push('/settings')
-      return
-    }
-
-    const now = new Date()
-    const yymmdd = now.getFullYear().toString().slice(2) +
-      String(now.getMonth() + 1).padStart(2, '0') +
-      String(now.getDate()).padStart(2, '0')
-    const hhmmss = String(now.getHours()).padStart(2, '0') +
-      String(now.getMinutes()).padStart(2, '0') +
-      String(now.getSeconds()).padStart(2, '0')
-
-    const storeCode = staff.stores.store_code
-    const receipt = `${storeCode}-${yymmdd}-${hhmmss}-${staff.employee_code}`
-    const origin = window.location.origin
-    const surveyUrl = `${origin}/survey/${receipt}`
-
-    await supabase.from('customers').insert({
-      receipt_number: receipt,
-      store_id: staff.store_id,
-      staff_id: staff.id,
-      status: 'surveying',
-    })
-
-    setShowQR(surveyUrl)
-  }
-
-  const closeQR = () => setShowQR(null)
 
   const statusLabel = (status: string) => {
     const labels: Record<string, string> = {
@@ -133,6 +102,30 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* 🔥 固定QRコード（常に表示） */}
+      {fixedQrUrl && staff && (
+        <div className="px-4 pt-4 max-w-2xl mx-auto">
+          <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-[#1A56DB] border-dashed">
+            <div className="flex items-start gap-4">
+              <div className="bg-white p-2 rounded-lg shrink-0">
+                <QRCodeSVG value={fixedQrUrl} size={100} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-[#1F2937]">📱 お客様に見せるQRコード</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {staff.stores?.name} / {staff.name} さん
+                </p>
+                <p className="text-xs text-gray-400">
+                  お客様が読み取ると自動で受付番号が発行されます
+                </p>
+                <button onClick={() => { navigator.clipboard.writeText(fixedQrUrl); alert('URLをコピーしました') }}
+                  className="mt-2 text-xs text-[#1A56DB] hover:underline">URLをコピー</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 店舗フィルタ */}
       <div className="px-4 pt-4 max-w-2xl mx-auto">
         <select
@@ -152,37 +145,12 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="p-4 max-w-2xl mx-auto">
-        <button onClick={issueReceipt}
-          className="w-full py-4 rounded-xl bg-white border-2 border-dashed border-[#1A56DB] text-[#1A56DB] font-bold text-lg hover:bg-[#EFF6FF] transition-all"
-        >＋ 受付番号を発行する</button>
-      </div>
-
-      {showQR && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={closeQR}>
-          <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center" onClick={(e) => e.stopPropagation()}>
-            <div className="text-3xl mb-2">📱</div>
-            <h2 className="text-lg font-bold text-[#1F2937] mb-1">QRコードを表示</h2>
-            <p className="text-sm text-gray-500 mb-4">お客様のスマホで読み取ってください</p>
-            <div className="bg-white p-4 rounded-xl inline-block mb-4">
-              <QRCodeSVG value={showQR} size={200} />
-            </div>
-            <p className="text-xs text-gray-400 font-mono break-all bg-gray-50 rounded-lg p-2 mb-4">{showQR}</p>
-            <div className="flex gap-2">
-              <button onClick={() => { navigator.clipboard.writeText(showQR); alert('URLをコピーしました') }}
-                className="flex-1 py-2 rounded-lg border border-gray-200 text-gray-600 text-sm">URLをコピー</button>
-              <button onClick={closeQR} className="flex-1 py-2 rounded-lg bg-[#1A56DB] text-white text-sm">閉じる</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="p-4 max-w-2xl mx-auto space-y-3">
         {loading ? (
           <div className="text-center text-gray-500 py-8">読み込み中...</div>
         ) : filteredCustomers.length === 0 ? (
           <div className="text-center text-gray-400 py-8">
-            「受付番号を発行する」ボタンからQRコードを発行してください
+            画面上のQRコードをお客様に読み取ってもらってください
           </div>
         ) : (
           filteredCustomers.map((customer) => (
