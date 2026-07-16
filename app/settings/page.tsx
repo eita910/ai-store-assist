@@ -11,11 +11,10 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'アドミン',
 }
 
+// アドミンは自分（005970）だけ固定。設定画面では選べない
 const ROLE_LIST = [
   { value: 'staff', label: 'スタッフ' },
   { value: 'manager', label: '店長' },
-  { value: 'headquarters', label: '本部' },
-  { value: 'admin', label: 'アドミン' },
 ]
 
 export default function SettingsPage() {
@@ -30,7 +29,8 @@ export default function SettingsPage() {
     employee_code: '',
     name: '',
   })
-  const [selectedRole, setSelectedRole] = useState('staff')
+  const [selectedRole, setSelectedRole] = useState('')
+  const ADMIN_EMPLOYEE = '005970'
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -45,7 +45,7 @@ export default function SettingsPage() {
       const { data: s } = await supabase.from('staff').select('*, stores(*)').eq('id', user.id).single()
       if (s) {
         setStaff(s)
-        setIsAdmin(s.role === 'admin')
+        setIsAdmin(s.employee_code === ADMIN_EMPLOYEE)
         setSelectedRole(s.role || 'staff')
         setForm({
           area: s.stores?.area || '',
@@ -85,8 +85,8 @@ export default function SettingsPage() {
       name: form.name,
     }
 
-    // adminだけがロールを変更可能
-    if (isAdmin && selectedRole !== staff?.role) {
+    // アドミンだけがロールを変更可能（社員番号005970固定）
+    if (staff?.employee_code === ADMIN_EMPLOYEE && selectedRole !== staff?.role) {
       updateData.role = selectedRole
     }
 
@@ -172,23 +172,28 @@ export default function SettingsPage() {
               <label className="block text-sm font-bold text-[#1F2937] mb-1">
                 ⑥ 権限 <span className="text-red-500">*</span>
               </label>
-              {isAdmin ? (
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB] bg-white"
-                >
-                  {ROLE_LIST.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
-                  ))}
-                </select>
+              {staff?.employee_code === ADMIN_EMPLOYEE ? (
+                <div className="space-y-2">
+                  <input type="text" value="アドミン" disabled
+                    className="w-full border border-gray-100 rounded-lg px-4 py-3 text-gray-400 bg-gray-50 cursor-not-allowed" />
+                  <select
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3 text-[#1F2937] focus:outline-none focus:border-[#1A56DB] bg-white"
+                  >
+                    {ROLE_LIST.map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400">自分以外のスタッフの権限を変更できます（アドミンは自分だけです）</p>
+                </div>
               ) : (
-                <input type="text" value={ROLE_LABELS[staff?.role] || 'スタッフ'} disabled
-                  className="w-full border border-gray-100 rounded-lg px-4 py-3 text-gray-400 bg-gray-50 cursor-not-allowed" />
+                <div>
+                  <input type="text" value={ROLE_LABELS[staff?.role] || 'スタッフ'} disabled
+                    className="w-full border border-gray-100 rounded-lg px-4 py-3 text-gray-400 bg-gray-50 cursor-not-allowed" />
+                  <p className="text-xs text-gray-400 mt-1">※ 権限の変更はアドミンに依頼してください</p>
+                </div>
               )}
-              <p className="text-xs text-gray-400 mt-1">
-                {isAdmin ? '※ アドミンは権限を変更できます' : '※ 権限の変更はアドミンに依頼してください'}
-              </p>
             </div>
 
             {error && <p className="text-red-500 text-sm">{error}</p>}
