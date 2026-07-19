@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { QRCodeSVG } from 'qrcode.react'
+
 
 type Customer = {
   id: string
@@ -31,7 +31,6 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [staff, setStaff] = useState<any>(null)
-  const [fixedQrUrl, setFixedQrUrl] = useState('')
   const router = useRouter()
   const supabase = createClient()
 
@@ -43,9 +42,6 @@ export default function DashboardPage() {
       if (s) {
         setStaff(s)
         setSelectedStoreId(s.store_id)
-        // 固定QRコードのURL（スタッフがログイン中は常に同じ）
-        const origin = window.location.origin
-        setFixedQrUrl(`${origin}/survey/start?staff=${s.employee_code}&store=${s.stores?.store_code || ''}`)
       }
     })
 
@@ -93,7 +89,11 @@ export default function DashboardPage() {
       <div className="bg-[#1A56DB] text-white px-4 py-5">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold">📊 接客ダッシュボード</h1>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <button onClick={() => router.push('/qr')}
+              className="text-sm bg-white/20 px-3 py-1.5 rounded-lg hover:bg-white/30 transition-all">📱</button>
+            <button onClick={() => router.push('/results')}
+              className="text-sm text-blue-100 hover:text-white">📊</button>
             <button onClick={() => router.push('/settings')}
               className="text-sm text-blue-100 hover:text-white">⚙️</button>
             <button onClick={async () => { await supabase.auth.signOut(); router.push('/login') }}
@@ -101,30 +101,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* 🔥 固定QRコード（常に表示） */}
-      {fixedQrUrl && staff && (
-        <div className="px-4 pt-4 max-w-2xl mx-auto">
-          <div className="bg-white rounded-xl p-4 shadow-sm border-2 border-[#1A56DB] border-dashed">
-            <div className="flex items-start gap-4">
-              <div className="bg-white p-2 rounded-lg shrink-0">
-                <QRCodeSVG value={fixedQrUrl} size={100} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-[#1F2937]">📱 お客様に見せるQRコード</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  {staff.stores?.name} / {staff.name} さん
-                </p>
-                <p className="text-xs text-gray-400">
-                  お客様が読み取ると自動で受付番号が発行されます
-                </p>
-                <button onClick={() => { navigator.clipboard.writeText(fixedQrUrl); alert('URLをコピーしました') }}
-                  className="mt-2 text-xs text-[#1A56DB] hover:underline">URLをコピー</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 店舗フィルタ */}
       <div className="px-4 pt-4 max-w-2xl mx-auto">
@@ -150,7 +126,8 @@ export default function DashboardPage() {
           <div className="text-center text-gray-500 py-8">読み込み中...</div>
         ) : filteredCustomers.length === 0 ? (
           <div className="text-center text-gray-400 py-8">
-            画面上のQRコードをお客様に読み取ってもらってください
+            受付データがまだありません。<br />
+            ヘッダーの📱ボタンからQRコードを表示してお客様に読み取ってもらってください。
           </div>
         ) : (
           filteredCustomers.map((customer) => (

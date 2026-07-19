@@ -1,7 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+
+type KonetaArticle = {
+  title: string
+  url: string
+}
 
 export default function SurveyPage({ params }: { params: Promise<{ id: string }> }) {
   const [id, setId] = useState<string | null>(null)
@@ -18,6 +23,7 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [konetaArticles, setKonetaArticles] = useState<KonetaArticle[]>([])
 
   useState(() => { params.then((p) => setId(p.id)) })
 
@@ -63,6 +69,15 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
 
     if (err) { setError('送信に失敗しました。もう一度お試しください。'); setLoading(false); return }
     setSubmitted(true); setLoading(false)
+
+    // ノジマの小ネタを取得
+    fetch('/api/koneta').then((r) => r.json()).then((data) => {
+      if (data.articles?.length > 0) {
+        // ランダムに2件選ぶ
+        const shuffled = [...data.articles].sort(() => Math.random() - 0.5)
+        setKonetaArticles(shuffled.slice(0, 2))
+      }
+    }).catch(() => {})
   }
 
   const Tile = ({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) => (
@@ -82,11 +97,51 @@ export default function SurveyPage({ params }: { params: Promise<{ id: string }>
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-[#EFF6FF] flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="text-5xl mb-4">🎉</div>
-          <h2 className="text-xl font-bold text-[#1F2937] mb-2">ご回答ありがとうございます</h2>
-          <p className="text-gray-600">スタッフがすぐにご提案にうかがいますので、少々お待ちください。</p>
+      <div className="min-h-screen bg-[#EFF6FF]">
+        <div className="bg-[#1A56DB] text-white px-4 py-5">
+          <h1 className="text-xl font-bold">🎉 ご回答ありがとうございます</h1>
+        </div>
+        <div className="p-4 max-w-lg mx-auto">
+          {/* 完了メッセージ */}
+          <div className="bg-white rounded-xl p-6 shadow-sm text-center mb-4">
+            <div className="text-5xl mb-3">🙏</div>
+            <p className="text-gray-600">
+              アンケートのご協力ありがとうございました。<br />
+              よろしければ、お買い物の参考にご覧ください。
+            </p>
+          </div>
+
+          {/* ノジマ小ネタ帳 */}
+          {konetaArticles.length > 0 && (
+            <div className="bg-white rounded-xl p-5 shadow-sm">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-lg">💡</span>
+                <h2 className="text-sm font-bold text-[#1F2937]">家電の小ネタ帳</h2>
+              </div>
+              <p className="text-xs text-gray-400 mb-3">
+                ノジマサポートサイトより — お役立ち情報をご紹介します。
+              </p>
+              <div className="space-y-3">
+                {konetaArticles.map((article, i) => (
+                  <a key={i} href={article.url} target="_blank" rel="noopener noreferrer"
+                    className="block p-3 rounded-lg border border-gray-100 hover:border-[#1A56DB] hover:bg-[#EFF6FF] transition-all">
+                    <p className="text-sm text-[#1F2937] font-medium">{article.title}</p>
+                    <p className="text-xs text-[#1A56DB] mt-1">詳しく見る →</p>
+                  </a>
+                ))}
+              </div>
+              <a href="https://www.nojima.co.jp/support/koneta/" target="_blank" rel="noopener noreferrer"
+                className="block text-center text-xs text-gray-400 mt-3 hover:text-[#1A56DB]">
+                もっと見る（ノジマサポートサイト）
+              </a>
+            </div>
+          )}
+
+          {konetaArticles.length === 0 && (
+            <div className="text-center text-gray-400 text-sm py-4">
+              読み込み中...
+            </div>
+          )}
         </div>
       </div>
     )
